@@ -1,1 +1,1 @@
-"C:\Program Files\MongoDB\Server\3.2\bin\mongod.exe" --dbpath "C:\mongod_data" --logpath "C:\mongod.log" --port 27017 --logappend
+"C:\Program Files\MongoDB\Server\3.2\bin\mongod.exe" --dbpath "C:\data" --logpath "C:\mongod.log" --port 27017 --logappend

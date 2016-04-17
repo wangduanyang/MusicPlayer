@@ -1,2 +1,2 @@
 #!/usr/bin/env zsh
-mongod --dbpath /home/magicyang/mongod_data --logpath /home/magicyang/mongod.log --port 27017 --logappend
+sudo mongod --dbpath /home/magicyang/mongod_data --logpath /home/magicyang/mongod.log --port 27017 --logappend

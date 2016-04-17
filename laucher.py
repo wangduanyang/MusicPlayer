@@ -1,16 +1,21 @@
 #!/usr/bin/env python
 # encoding='utf-8'
 import codecs
+import json
 import os
 import sys
 import platform
+from urllib.parse import urlencode
+
 from PyQt4 import QtGui, uic
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QFileDialog, QListWidgetItem
 from PyQt4.phonon import Phonon
 
 from SongModel import SongModel
-
+import pycurl
+from io import BytesIO
+print(sys.getdefaultencoding())
 # reload(sys)
 # enc = sys.getdefaultencoding()
 # print(enc)
@@ -57,17 +62,12 @@ class MyApp(QtGui.QMainWindow, Ui_MainWindow):
 
     #显示歌词
     def show_lrc(self, src):
-        # src = '/home/magicyang/Music/All Time Low-Time-Bomb.lrc'
-        # os.remove(self.dst)
         if(sysname == 'Linux'):
             self.GBK_2_UTF8(src, self.dst)
             lrc_file = open(self.dst)
         else:
             lrc_file = open(src)
-        # lrc_file = codecs.open('/home/magicyang/Music/Alan Jackson-Remember When.lrc', 'r', 'utf-8')
-        # print(type(lrc_file))
         for line in lrc_file.readlines():
-        #     print(line.strip())
             if(line.strip() != ''):
                 item = QListWidgetItem(line)
                 self.listWidget_lrc.insertItem(self.listWidget_lrc.count(), item)
@@ -198,7 +198,66 @@ class MyApp(QtGui.QMainWindow, Ui_MainWindow):
                     if(os.path.exists(self.lrc)):
                         dic = {'name':filename, 'url':filepath, 'lrc':self.lrc}
                     else:
-                        dic = {'name':filename, 'url':filepath, 'lrc':''}
+                        #如果没有歌词就在线获取歌词
+
+                        [author, name] = os.path.splitext(filename)[0].split('-')
+                        # print(author+':'+name)
+                        # print(repr(name))
+                        # url= BytesIO()
+                        url = 'http://geci.me/api/lyric/'+name+'/'+author
+                        burl =  bytes(url, encoding = "utf8")
+                        print(url)
+                        c = pycurl.Curl()
+                        #获取搜索结果
+                        c.setopt(c.URL, burl)
+                        # c.setopt(c.HTTPHEADER, ['Accept: text/html', 'Accept-Charset: UTF-8'])
+                        b = BytesIO()
+                        c.setopt(c.WRITEFUNCTION, b.write)
+                        c.perform()
+                        http_code = c.getinfo(pycurl.HTTP_CODE)
+                        print(http_code)
+                        # print(b.getvalue().decode('utf-8')
+                        res = b.getvalue().decode('utf-8')
+                        b.close()
+                        res_json = json.loads(res)
+                        print(res_json)
+                        count = res_json['count']
+                        # print(res_json['result'][0]['lrc'])
+                        if(http_code == 200 and count > 0):
+
+                            #根据搜索结果中的url获取歌词
+                            for i in range(0, count):
+                                b2 = BytesIO()
+                                # print(b.getvalue().decode('utf-8'))
+                                lrc_url = res_json['result'][i]['lrc']
+                                c.setopt(c.URL, lrc_url)
+                                c.setopt(c.WRITEFUNCTION, b2.write)
+                                c.perform()
+                                res = b2.getvalue().decode('utf-8')
+                                # print(res)
+                                b2.close()
+                                http_code = c.getinfo(pycurl.HTTP_CODE)
+                                print(http_code)
+                                # break
+                                if(http_code == 404):
+                                    continue
+                                elif(http_code == 200):
+                                    print('found')
+                                    print(res)
+                                    #把歌词写入文件
+                                    print(self.lrc)
+                                    fn = codecs.open(self.lrc, 'w', 'gbk')
+                                    fn.write(res)
+                                    fn.close()
+                                    print('歌词获取成功')
+                                    break
+                            else:
+                                print('没有对应歌词')
+                        else:
+                            print('服务器异常')
+
+                        # print(self.contents)
+                        dic = {'name':filename, 'url':filepath, 'lrc':self.lrc}
                     self.songModel.put_item(dic)#添加到数据库
             #更新播放列表
             self.initPlaylist()
@@ -210,6 +269,9 @@ class MyApp(QtGui.QMainWindow, Ui_MainWindow):
             # item = QListWidgetItem(self.filename)
             # self.listWidget.insertItem(0, item)
 
+    # def curl_lyc_callback(self, buf):
+    #     self.contents = ''
+    #     self.contents = self.contents + buf
 
     def open_dir(self):
         dlg = QFileDialog(self)
